@@ -9,6 +9,7 @@ Reference for removing duplicate photos and videos from Dropbox using CLI tools 
 - **Enable Dropbox Version History** on your account before running any destructive commands — this is your safety net.
 - **Always dry-run first.** Every tool below has a preview/list mode. Use it.
 - Hash-based dedup finds *identical* files only. For "similar but not identical" photos (different edits, resizes, crops), see [Similar Photos](#similar-photos-not-identical) below.
+- `rclone dedupe` targets **all file types** — scope your runs to media folders to avoid touching unrelated files.
 
 ---
 
@@ -28,20 +29,36 @@ rclone config
 # Follow the OAuth browser flow
 ```
 
+### Folder structure
+
+Primary media folders in this Dropbox:
+
+| Folder | Contents |
+|---|---|
+| `Family` | Family photos and videos |
+| `Immich` | Immich-synced media |
+| `Other Photos` | Photos (note: folder name contains a space — always quote it) |
+
+Other folders (`DJ`, `Documents`, `Apps`, `iMovie`, `@SynologyCloudSync`, `.covers`) are non-media and generally don't need dedup runs.
+
 ### Dry run — list duplicates only
 
 ```bash
-# Entire Dropbox
-rclone dedupe --by-hash --dedupe-mode list dropbox:
+# Media folders (recommended — avoids touching non-media files)
+rclone dedupe --by-hash --dedupe-mode list dropbox:Family
+rclone dedupe --by-hash --dedupe-mode list dropbox:Immich
+rclone dedupe --by-hash --dedupe-mode list "dropbox:Other Photos"
 
-# Specific folder
-rclone dedupe --by-hash --dedupe-mode list dropbox:Photos
+# Entire Dropbox (use with caution)
+rclone dedupe --by-hash --dedupe-mode list dropbox:
 ```
 
 ### Delete duplicates, keeping the newest copy
 
 ```bash
-rclone dedupe --by-hash --dedupe-mode newest dropbox:Photos
+rclone dedupe --by-hash --dedupe-mode newest --tpslimit 4 --tpslimit-burst 4 dropbox:Family
+rclone dedupe --by-hash --dedupe-mode newest --tpslimit 4 --tpslimit-burst 4 dropbox:Immich
+rclone dedupe --by-hash --dedupe-mode newest --tpslimit 4 --tpslimit-burst 4 "dropbox:Other Photos"
 ```
 
 ### Dropbox API Rate Limiting
@@ -59,13 +76,13 @@ Always include `--tpslimit` flags to stay under the limit:
 rclone dedupe --by-hash --dedupe-mode newest \
   --tpslimit 4 \
   --tpslimit-burst 4 \
-  dropbox:
+  dropbox:Family
 
 # Conservative: 2 TPS (if 4 still triggers rate limits)
 rclone dedupe --by-hash --dedupe-mode newest \
   --tpslimit 2 \
   --tpslimit-burst 2 \
-  dropbox:
+  dropbox:Family
 ```
 
 - `--tpslimit` — max API transactions per second
@@ -90,7 +107,7 @@ The run will be slower but will complete without hitting the 300s retry wall.
 
 ## Option 2: jdupes (Better for Cross-Folder Dedup)
 
-Best for: same file present in multiple folders (e.g. `Camera Uploads/` and `Photos/2023/`). Works on a local copy of your Dropbox.
+Best for: same file present in multiple folders (e.g. `Camera Uploads/` and `Family/2023/`). Works on a local copy of your Dropbox.
 
 ### Install
 
@@ -105,17 +122,17 @@ sudo apt install jdupes
 ### Workflow
 
 ```bash
-# 1. Pull Dropbox folder locally
-rclone sync dropbox:Photos ~/dropbox-photos/
+# 1. Pull media folder locally
+rclone sync dropbox:Family ~/dropbox-family/
 
 # 2. Preview duplicates (no changes)
-jdupes -r ~/dropbox-photos/
+jdupes -r ~/dropbox-family/
 
 # 3. Delete duplicates, keeping the first copy found per group
-jdupes -r -d ~/dropbox-photos/
+jdupes -r -d ~/dropbox-family/
 
 # 4. Push cleaned folder back
-rclone sync ~/dropbox-photos/ dropbox:Photos
+rclone sync ~/dropbox-family/ dropbox:Family
 ```
 
 ### Useful jdupes flags
@@ -155,17 +172,18 @@ Workflow: sync Dropbox locally → run tool → review matches manually → sync
 ## Quick Reference
 
 ```bash
-# Audit duplicates (safe, no changes)
-rclone dedupe --by-hash --dedupe-mode list dropbox:Photos
+# Audit media folders (safe, no changes)
+rclone dedupe --by-hash --dedupe-mode list dropbox:Family
+rclone dedupe --by-hash --dedupe-mode list dropbox:Immich
+rclone dedupe --by-hash --dedupe-mode list "dropbox:Other Photos"
 
 # Remove duplicates, keep newest (with rate limit protection)
-rclone dedupe --by-hash --dedupe-mode newest --tpslimit 4 --tpslimit-burst 4 dropbox:Photos
-
-# Full Dropbox scan (with rate limit protection)
-rclone dedupe --by-hash --dedupe-mode newest --tpslimit 4 --tpslimit-burst 4 dropbox:
+rclone dedupe --by-hash --dedupe-mode newest --tpslimit 4 --tpslimit-burst 4 dropbox:Family
+rclone dedupe --by-hash --dedupe-mode newest --tpslimit 4 --tpslimit-burst 4 dropbox:Immich
+rclone dedupe --by-hash --dedupe-mode newest --tpslimit 4 --tpslimit-burst 4 "dropbox:Other Photos"
 
 # Local dedup with jdupes
-jdupes -r -d ~/dropbox-photos/
+jdupes -r -d ~/dropbox-family/
 ```
 
 ---
