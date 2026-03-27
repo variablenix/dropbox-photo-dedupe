@@ -83,6 +83,12 @@ rclone dedupe --by-hash --dedupe-mode newest \
   --tpslimit 2 \
   --tpslimit-burst 2 \
   dropbox:Family
+
+# Include multiple media file types
+rclone dedupe --by-hash --dedupe-mode newest \
+  --tpslimit 4 --tpslimit-burst 4 \
+  --include "*.{jpg,jpeg,png,gif,heic,mp4,mov,avi,mkv}" \
+  dropbox:
 ```
 
 - `--tpslimit` — max API transactions per second
